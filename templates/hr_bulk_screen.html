@@ -1,0 +1,374 @@
+{% extends "base.html" %}
+{% block title %}Bulk Screen Candidates | RecruiterAI{% endblock %}
+
+{% block content %}
+<style>
+    .drop-zone {
+        border: 2px dashed var(--border);
+        border-radius: 12px;
+        padding: 3rem;
+        text-align: center;
+        background: rgba(var(--bg-rgb), 0.5);
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    .drop-zone.dragover {
+        border-color: var(--primary);
+        background: rgba(99, 102, 241, 0.05);
+    }
+    .drop-zone i {
+        font-size: 3rem;
+        color: var(--text-muted);
+        margin-bottom: 1rem;
+    }
+    .progress-wrapper {
+        display: none;
+        margin-top: 2rem;
+    }
+    .progress {
+        height: 10px;
+        border-radius: 5px;
+        background: var(--border);
+        overflow: hidden;
+    }
+    .progress-bar {
+        height: 100%;
+        background: var(--primary);
+        width: 0%;
+        transition: width 0.4s ease;
+    }
+    .results-container {
+        display: none;
+        margin-top: 2rem;
+    }
+    .result-card {
+        background: var(--bg-card, #fff);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    }
+    .score-chip {
+        display: inline-block;
+        padding: 0.2rem 0.6rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        margin-right: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+    .score-overall { background: rgba(99, 102, 241, 0.1); color: var(--primary); font-size: 1rem; }
+    .score-skill { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+    .score-jd { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
+    .score-exp { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+    .method-badge {
+        font-size: 0.7rem;
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        text-transform: uppercase;
+        font-weight: 600;
+        float: right;
+    }
+    .method-llm { background: rgba(139, 92, 246, 0.1); color: #8b5cf6; border: 1px solid rgba(139, 92, 246, 0.2); }
+    .method-tfidf { background: rgba(107, 114, 128, 0.1); color: #6b7280; border: 1px solid rgba(107, 114, 128, 0.2); }
+    .skill-chip {
+        display: inline-block;
+        padding: 0.15rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        margin-right: 0.3rem;
+        margin-bottom: 0.3rem;
+    }
+    .skill-match { background: rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.2); }
+    .skill-missing { background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); }
+    .collapsed-table-wrapper {
+        margin-top: 1.5rem;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        overflow: hidden;
+    }
+</style>
+
+<div class="hr-layout">
+    <nav class="hr-sidebar">
+        <div style="padding: 0 1.5rem 1.5rem; border-bottom: 1px solid var(--border); margin-bottom: 1rem;">
+            <div style="font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase;">Logged in as</div>
+            <div style="font-weight: 600; color: var(--text-primary);">{{ session.hr_user.name }}</div>
+        </div>
+        <a href="{{ url_for('hr_dashboard') }}" class="sidebar-link">
+            <i class="bi bi-grid-1x2"></i> Dashboard
+        </a>
+        <a href="{{ url_for('hr_jobs') }}" class="sidebar-link active">
+            <i class="bi bi-briefcase"></i> Job Listings
+        </a>
+    </nav>
+
+    <div class="hr-content">
+        <div class="mb-4 d-flex justify-content-between align-items-center">
+            <div>
+                <a href="{{ url_for('hr_jobs') }}" class="text-decoration-none text-muted" style="font-size: 0.9rem;">
+                    <i class="bi bi-arrow-left"></i> Back to Jobs
+                </a>
+                <h1 style="font-size: 1.8rem; margin-top: 0.5rem;">Bulk Screen CVs</h1>
+                <p style="color: var(--text-muted);">for <strong>{{ job.title }}</strong></p>
+            </div>
+        </div>
+
+        <div class="card-glass p-4" id="upload-section">
+            <div class="drop-zone" id="drop-zone">
+                <i class="bi bi-cloud-arrow-up"></i>
+                <h4 style="margin-bottom: 0.5rem;">Drag & Drop Resumes Here</h4>
+                <p style="color: var(--text-muted); font-size: 0.9rem;">Or click to browse (up to 20 files, PDF/DOC/DOCX)</p>
+                <input type="file" id="file-input" multiple accept=".pdf,.doc,.docx" style="display: none;">
+            </div>
+
+            <div class="progress-wrapper" id="progress-wrapper">
+                <div class="d-flex justify-content-between mb-2">
+                    <strong id="progress-status">Processing...</strong>
+                    <span id="progress-text">0/0</span>
+                </div>
+                <div class="progress">
+                    <div class="progress-bar" id="progress-bar"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="results-container" id="results-container">
+            <h3 class="mb-4">Screening Results</h3>
+            <div id="top-results"></div>
+
+            <div class="accordion mt-4 d-none" id="other-results-accordion">
+                <div class="accordion-item" style="border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: transparent;">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#other-results-collapse" style="background: rgba(0,0,0,0.02); font-weight: 600; box-shadow: none;">
+                            Other Candidates (Ranked 6th and below)
+                        </button>
+                    </h2>
+                    <div id="other-results-collapse" class="accordion-collapse collapse" data-bs-parent="#other-results-accordion">
+                        <div class="accordion-body p-0">
+                            <table class="table mb-0" style="background: transparent;">
+                                <thead>
+                                    <tr>
+                                        <th style="background: transparent; border-bottom: 1px solid var(--border);">Rank</th>
+                                        <th style="background: transparent; border-bottom: 1px solid var(--border);">Name</th>
+                                        <th style="background: transparent; border-bottom: 1px solid var(--border);">Score</th>
+                                        <th style="background: transparent; border-bottom: 1px solid var(--border);">Method</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="other-results-tbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const progressWrapper = document.getElementById('progress-wrapper');
+    const progressBar = document.getElementById('progress-bar');
+    const progressText = document.getElementById('progress-text');
+    const progressStatus = document.getElementById('progress-status');
+    const resultsContainer = document.getElementById('results-container');
+    const topResults = document.getElementById('top-results');
+    const otherAccordion = document.getElementById('other-results-accordion');
+    const otherTbody = document.getElementById('other-results-tbody');
+
+    const MAX_FILES = 20;
+    const JOB_ID = "{{ job._id }}";
+
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+    });
+
+    dropZone.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        handleFiles(e.dataTransfer.files);
+    });
+
+    fileInput.addEventListener('change', (e) => {
+        handleFiles(e.target.files);
+    });
+
+    async function handleFiles(fileList) {
+        let files = Array.from(fileList);
+        if (files.length === 0) return;
+
+        if (files.length > MAX_FILES) {
+            alert(`Maximum ${MAX_FILES} files allowed. Slicing to first ${MAX_FILES}.`);
+            files = files.slice(0, MAX_FILES);
+        }
+
+        dropZone.style.display = 'none';
+        progressWrapper.style.display = 'block';
+        resultsContainer.style.display = 'none';
+
+        const results = [];
+        const total = files.length;
+        let processed = 0;
+
+        for (const file of files) {
+            progressStatus.innerText = `Processing: ${file.name}`;
+            try {
+                const formData = new FormData();
+                formData.append('resume', file);
+
+                const response = await fetch(`/api/hr/job/${JOB_ID}/screen-single`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    results.push(data);
+                } else {
+                    results.push({
+                        candidate_name: file.name,
+                        error: data.error || 'Unknown error'
+                    });
+                }
+            } catch (err) {
+                results.push({
+                    candidate_name: file.name,
+                    error: err.toString()
+                });
+            }
+
+            processed++;
+            progressBar.style.width = `${(processed / total) * 100}%`;
+            progressText.innerText = `${processed}/${total}`;
+        }
+
+        progressStatus.innerText = 'Processing complete!';
+        renderResults(results);
+    }
+
+    function renderResults(results) {
+        // Sort valid results by score descending
+        const valid = results.filter(r => !r.error).sort((a, b) => (b.screening.score || 0) - (a.screening.score || 0));
+        const invalid = results.filter(r => r.error);
+
+        topResults.innerHTML = '';
+        otherTbody.innerHTML = '';
+        resultsContainer.style.display = 'block';
+
+        let rank = 1;
+
+        valid.forEach((res, index) => {
+            const sc = res.screening;
+            const methodClass = sc.method === 'llm' ? 'method-llm' : 'method-tfidf';
+            const methodLabel = sc.method === 'llm' ? 'LLM' : 'TF-IDF';
+
+            if (index < 5) {
+                // Top 5 detailed cards
+                const card = document.createElement('div');
+                card.className = 'result-card fade-in';
+                
+                let skillsHtml = '';
+                if (sc.matched_skills && sc.matched_skills.length > 0) {
+                    skillsHtml += `<div><strong>Matched:</strong> ` + sc.matched_skills.map(s => `<span class="skill-chip skill-match">${s}</span>`).join('') + `</div>`;
+                }
+                if (sc.missing_skills && sc.missing_skills.length > 0) {
+                    skillsHtml += `<div class="mt-1"><strong>Missing:</strong> ` + sc.missing_skills.map(s => `<span class="skill-chip skill-missing">${s}</span>`).join('') + `</div>`;
+                }
+
+                let strengthConcernHtml = '';
+                if ((sc.strengths && sc.strengths.length > 0) || (sc.concerns && sc.concerns.length > 0)) {
+                    strengthConcernHtml = `<div class="row mt-3 text-sm">`;
+                    if (sc.strengths && sc.strengths.length > 0) {
+                        strengthConcernHtml += `<div class="col-md-6"><strong class="text-success"><i class="bi bi-plus-circle"></i> Strengths</strong><ul class="mb-0 ps-3">` + 
+                            sc.strengths.map(s => `<li>${s}</li>`).join('') + `</ul></div>`;
+                    }
+                    if (sc.concerns && sc.concerns.length > 0) {
+                        strengthConcernHtml += `<div class="col-md-6"><strong class="text-danger"><i class="bi bi-exclamation-circle"></i> Concerns</strong><ul class="mb-0 ps-3">` + 
+                            sc.concerns.map(c => `<li>${c}</li>`).join('') + `</ul></div>`;
+                    }
+                    strengthConcernHtml += `</div>`;
+                }
+
+                let contactInfoHtml = '';
+                const email = res.candidate_email;
+                const phone = res.candidate_phone;
+                const links = res.candidate_links || [];
+                
+                if (email || phone || links.length > 0) {
+                    contactInfoHtml += `<div class="mb-3 text-secondary" style="font-size: 0.85rem;">`;
+                    if (email) contactInfoHtml += `<span class="me-3"><i class="bi bi-envelope"></i> <a href="mailto:${email}" class="text-decoration-none text-secondary">${email}</a></span>`;
+                    if (phone) contactInfoHtml += `<span class="me-3"><i class="bi bi-telephone"></i> ${phone}</span>`;
+                    if (links.length > 0) {
+                        links.forEach(link => {
+                            let url = link.startsWith('http') ? link : 'https://' + link;
+                            contactInfoHtml += `<span class="me-3"><i class="bi bi-link-45deg"></i> <a href="${url}" target="_blank" class="text-decoration-none">${link}</a></span>`;
+                        });
+                    }
+                    contactInfoHtml += `</div>`;
+                }
+
+                card.innerHTML = `
+                    <div class="method-badge ${methodClass}">${methodLabel}</div>
+                    <h4 style="margin-bottom: 0.2rem;">#${rank} ${res.candidate_name}</h4>
+                    ${contactInfoHtml}
+                    <div class="mb-3">
+                        <span class="score-chip score-overall"><i class="bi bi-star-fill"></i> Overall: ${sc.score}%</span>
+                        <span class="score-chip score-skill">Skills: ${sc.skill_match}%</span>
+                        <span class="score-chip score-jd">JD Match: ${sc.description_match}%</span>
+                        <span class="score-chip score-exp">Experience: ${sc.experience_match}%</span>
+                    </div>
+                    <div class="mb-2 text-secondary" style="font-size: 0.9rem;">
+                        <strong>Summary:</strong> ${sc.summary || 'No summary available.'}
+                    </div>
+                    ${skillsHtml}
+                    ${strengthConcernHtml}
+                `;
+                topResults.appendChild(card);
+            } else {
+                let contactText = '';
+                if (res.candidate_email) contactText += `<a href="mailto:${res.candidate_email}" class="text-decoration-none text-secondary me-2" title="${res.candidate_email}"><i class="bi bi-envelope"></i></a>`;
+                if (res.candidate_phone) contactText += `<span class="text-secondary me-2" title="${res.candidate_phone}"><i class="bi bi-telephone"></i></span>`;
+                if (res.candidate_links && res.candidate_links.length > 0) {
+                    let firstLink = res.candidate_links[0];
+                    let url = firstLink.startsWith('http') ? firstLink : 'https://' + firstLink;
+                    contactText += `<a href="${url}" target="_blank" class="text-decoration-none text-secondary" title="${firstLink}"><i class="bi bi-link-45deg"></i></a>`;
+                }
+
+                // Table row
+                otherAccordion.classList.remove('d-none');
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td style="background: transparent; border-bottom: 1px solid var(--border);">${rank}</td>
+                    <td style="background: transparent; border-bottom: 1px solid var(--border); font-weight: 500;">
+                        ${res.candidate_name}
+                        <div class="mt-1" style="font-size: 0.8rem;">${contactText}</div>
+                    </td>
+                    <td style="background: transparent; border-bottom: 1px solid var(--border);"><span class="text-primary font-weight-bold">${sc.score}%</span></td>
+                    <td style="background: transparent; border-bottom: 1px solid var(--border);"><span class="method-badge ${methodClass} float-none">${methodLabel}</span></td>
+                `;
+                otherTbody.appendChild(row);
+            }
+            rank++;
+        });
+
+        if (invalid.length > 0) {
+            const errorSection = document.createElement('div');
+            errorSection.className = 'mt-4 pt-3 border-top';
+            errorSection.innerHTML = `<h5 class="text-danger">Processing Errors</h5><ul class="text-danger" style="font-size: 0.85rem;">` + 
+                invalid.map(r => `<li><strong>${r.candidate_name}</strong>: ${r.error}</li>`).join('') + `</ul>`;
+            resultsContainer.appendChild(errorSection);
+        }
+    }
+</script>
+{% endblock %}

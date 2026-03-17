@@ -15,11 +15,27 @@
                     your profile instantly.</p>
             </div>
 
+            <!-- Application policy notice -->
+            <div
+                style="background: rgba(33,150,243,0.06); border: 1px solid rgba(33,150,243,0.18); border-radius: 10px; padding: 0.85rem 1.1rem; margin-bottom: 1.5rem; font-size: 0.83rem; color: #0d6eab; display: flex; gap: 0.6rem; align-items: flex-start;">
+                <i class="bi bi-info-circle-fill" style="margin-top: 1px; flex-shrink: 0;"></i>
+                <span>
+                    Each role accepts one application per candidate within a 3-month window.
+                    You are welcome to apply again after 3 months have passed.
+                </span>
+            </div>
+
             <form method="POST" enctype="multipart/form-data">
                 <!-- Name -->
                 <div class="mb-3">
-                    <label class="form-label-custom">Full Name <span class="text-orange">*</span></label>
+                    <label class="form-label-custom">
+                        Full Name <span class="text-orange">*</span>
+                    </label>
                     <input type="text" name="name" class="form-control-custom" placeholder="e.g. John Doe" required>
+                    <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.3rem;">
+                        <i class="bi bi-exclamation-circle"></i>
+                        Must match the full name written on your uploaded resume exactly.
+                    </div>
                 </div>
 
                 <!-- Email -->
@@ -51,7 +67,7 @@
                         <i class="bi bi-cloud-arrow-up"
                             style="font-size: 2rem; color: var(--accent); display: block; margin-bottom: 0.5rem;"></i>
                         <span style="color: var(--text-secondary); font-size: 0.9rem;" id="uploadLabel">
-                            Drag & drop your resume or <span class="text-orange"
+                            Drag &amp; drop your resume or <span class="text-orange"
                                 style="cursor: pointer; font-weight: 600;">click to browse</span>
                         </span>
                         <br>
@@ -79,7 +95,6 @@
 
 {% block scripts %}
 <script>
-    // File upload UI
     const resumeInput = document.getElementById('resumeInput');
     const uploadLabel = document.getElementById('uploadLabel');
     const dropZone = document.getElementById('dropZone');
@@ -92,7 +107,6 @@
         }
     });
 
-    // Drag & Drop
     dropZone.addEventListener('dragover', (e) => {
         e.preventDefault();
         dropZone.style.borderColor = 'var(--accent)';
@@ -113,7 +127,6 @@
         }
     });
 
-    // Form submission loading state
     document.querySelector('form').addEventListener('submit', function () {
         submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Analyzing your resume...';
         submitBtn.disabled = true;

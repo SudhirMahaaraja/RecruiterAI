@@ -1,0 +1,408 @@
+{% extends "base.html" %}
+<!-- FIXED VERSION 3.0 -->
+{% block title %}My Applications | RecruiterAI{% endblock %}
+
+{% block head %}
+<style>
+  .suggestions-section {
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .suggestion-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.2rem;
+    margin-bottom: 0.8rem;
+    transition: all 0.2s ease;
+  }
+
+  .suggestion-card:hover {
+    border-color: var(--primary);
+    box-shadow: 0 4px 16px rgba(85, 107, 47, 0.1);
+    transform: translateY(-2px);
+  }
+
+  .match-score {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  .match-score.high {
+    background: rgba(76, 175, 80, 0.1);
+    color: #4caf50;
+  }
+
+  .match-score.medium {
+    background: rgba(255, 152, 0, 0.1);
+    color: #ff9800;
+  }
+
+  .match-score.low {
+    background: rgba(244, 67, 54, 0.1);
+    color: #f44336;
+  }
+
+  .skill-gap {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    background: rgba(244, 67, 54, 0.08);
+    color: #f44336;
+    margin: 0.1rem;
+  }
+
+  .resume-insight {
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.72rem;
+    background: rgba(85, 107, 47, 0.08);
+    color: var(--primary);
+    margin: 0.1rem;
+  }
+
+  .insights-panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .loading-suggestions {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-muted);
+  }
+
+  .loading-suggestions .spinner {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    border: 3px solid rgba(85, 107, 47, 0.2);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .reapplication-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    background: rgba(255, 152, 0, 0.07);
+    border: 1px solid rgba(255, 152, 0, 0.22);
+    border-radius: 10px;
+    padding: 0.7rem 1rem;
+    margin-top: 0.8rem;
+    font-size: 0.83rem;
+    color: #b36b00;
+  }
+
+  .reapplication-notice i {
+    font-size: 1rem;
+    margin-top: 1px;
+    flex-shrink: 0;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="py-4">
+  <div class="container-custom" style="max-width: 1000px;">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <div>
+        <h1 style="font-size: 1.8rem;">
+          Welcome back, <span class="text-gradient">{{ session.get('candidate_name', 'Candidate') }}</span>
+        </h1>
+        <p style="color: var(--text-muted);">Track your applications and complete assessments</p>
+      </div>
+    </div>
+
+    {% if applications %}
+    {% for app in applications %}
+    <div class="card-glass fade-in mb-3" style="padding: 1.8rem;">
+      <div class="pipeline-track mb-3">
+        {% set stages = ['applied', 'assessment', 'coding_round', 'behavioural', 'tech_hr', 'final_hr', 'offer',
+        'hired'] %}
+        {% for stage in stages %}
+        {% set stage_idx = stages.index(stage) %}
+        {% set app_stage_idx = stages.index(app.stage) if app.stage in stages else -1 %}
+        {% if app.stage == stage %}
+        {% set step_class = 'active' %}
+        {% elif stage == 'applied' %}
+        {% set step_class = 'completed' %}
+        {% elif app_stage_idx > stage_idx %}
+        {% set step_class = 'completed' %}
+        {% else %}
+        {% set step_class = '' %}
+        {% endif %}
+        <div class="pipeline-step {{ step_class }}">
+          <div class="pipeline-dot">
+            {% if stage == 'applied' %}<i class="bi bi-check"></i>
+            {% elif stage == 'assessment' %}<i class="bi bi-pencil-square"></i>
+            {% elif stage == 'coding_round' %}<i class="bi bi-code-slash"></i>
+            {% elif stage == 'behavioural' %}<i class="bi bi-chat-dots"></i>
+            {% elif stage == 'tech_hr' %}<i class="bi bi-person-gear"></i>
+            {% elif stage == 'final_hr' %}<i class="bi bi-person-check"></i>
+            {% elif stage == 'offer' %}<i class="bi bi-envelope-paper"></i>
+            {% elif stage == 'hired' %}<i class="bi bi-trophy"></i>
+            {% endif %}
+          </div>
+          <div class="step-label">
+            {% if stage == 'coding_round' %}Coding
+            {% elif stage == 'behavioural' %}Behavioural
+            {% elif stage == 'tech_hr' %}Tech HR
+            {% elif stage == 'final_hr' %}Final HR
+            {% else %}{{ stage | title }}{% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div style="flex: 1;">
+          <h3 style="font-size: 1.2rem; margin-bottom: 0.3rem;">{{ app.job_title }}</h3>
+          <span class="badge-stage {{ app.stage }}">
+            {% if app.stage == 'assessment' %}<i class="bi bi-hourglass-split"></i>
+            {% elif app.stage == 'coding_round' %}<i class="bi bi-code-slash"></i>
+            {% elif app.stage == 'behavioural' %}<i class="bi bi-chat-dots"></i>
+            {% elif app.stage == 'tech_hr' %}<i class="bi bi-person-gear"></i>
+            {% elif app.stage == 'final_hr' %}<i class="bi bi-person-check"></i>
+            {% elif app.stage == 'offer' %}<i class="bi bi-envelope-paper"></i>
+            {% elif app.stage == 'hired' %}<i class="bi bi-check-circle-fill"></i>
+            {% elif app.stage == 'rejected' %}<i class="bi bi-x-circle"></i>
+            {% elif app.stage == 'flagged' %}<i class="bi bi-exclamation-triangle"></i>
+            {% else %}<i class="bi bi-circle"></i>
+            {% endif %}
+            {{ app.stage_label }}
+          </span>
+
+          {% if app.screening_score is not none %}
+          {% set screening_color = 'var(--primary)' if app.screening_score >= 70 else ('var(--accent)' if
+          app.screening_score >= 50 else 'var(--primary-dark)') %}
+          <div class="mt-2" style="font-size: 0.85rem; color: var(--text-muted);">
+            <i class="bi bi-robot"></i> AI Match Score:
+            <strong {{ ('style="color: ' ~ screening_color ~ ';"') | safe }}>{{ app.screening_score }}%</strong>
+          </div>
+          {% endif %}
+
+          {% if app.assessment_score is not none %}
+          {% set assess_color = ' var(--primary)' if app.assessment_score>= 70 else ('var(--accent)' if
+              app.assessment_score >= 50 else 'var(--primary-dark)') %}
+              <div style="font-size: 0.85rem; color: var(--text-muted);">
+                <i class="bi bi-clipboard-check"></i> Assessment Score:
+                <strong {{ ('style="color: ' ~ assess_color ~ ';"') | safe }}>{{ app.assessment_score }}%</strong>
+          </div>
+          {% endif %}
+
+          <!-- Reapplication notice -->
+          {% if app.is_reapplication %}
+          <div class="reapplication-notice">
+            <i class="bi bi-arrow-repeat"></i>
+            <span>
+              <strong>Reapplication:</strong> This is a follow-up to a previous application for this role.
+              Your earlier application history is on record.
+            </span>
+          </div>
+          {% endif %}
+
+          <!-- Same-role 3-month cooldown warning (shown after submission, as informational) -->
+          {% if not app.can_reapply and app.stage in [' rejected'] %} <div class="reapplication-notice"
+                  style="background: rgba(33,150,243,0.07); border-color: rgba(33,150,243,0.22); color: #0d6eab;">
+                  <i class="bi bi-info-circle"></i>
+                  <span>You may reapply for this role after 3 months from your application date.</span>
+              </div>
+              {% endif %}
+          </div>
+
+          <div class="d-flex gap-2 flex-wrap">
+            {% if app.stage == 'assessment' and not app.assessment_completed %}
+            <a href="{{ url_for('take_assessment', application_id=app._id) }}" class="btn-primary-custom btn-sm">
+              <i class="bi bi-play-fill"></i> Start Round 1
+            </a>
+            {% endif %}
+
+            {% if app.stage == 'coding_round' and not app.coding_completed %}
+            <a href="{{ url_for('take_coding_assessment', application_id=app._id) }}" class="btn-primary-custom btn-sm">
+              <i class="bi bi-code-slash"></i> Start Round 2: Coding
+            </a>
+            {% endif %}
+
+            {% if app.stage == 'behavioural' %}
+            <div class="badge-stage assessment" style="font-size: 0.82rem; padding: 0.5rem 1rem;">
+              <i class="bi bi-clock-history"></i> Awaiting HR to schedule your behavioural interview
+            </div>
+            {% endif %}
+
+            {% if app.stage == 'tech_hr' %}
+            <div class="badge-stage assessment" style="font-size: 0.82rem; padding: 0.5rem 1rem;">
+              <i class="bi bi-clock-history"></i> Awaiting Tech HR interview scheduling
+            </div>
+            {% endif %}
+
+            {% if app.stage == 'final_hr' %}
+            <div class="badge-stage assessment" style="font-size: 0.82rem; padding: 0.5rem 1rem;">
+              <i class="bi bi-clock-history"></i> Awaiting Final HR interview scheduling
+            </div>
+            {% endif %}
+
+            {% if app.stage == 'offer' %}
+            <div class="badge-stage offer" style="font-size: 0.82rem; padding: 0.5rem 1rem;">
+              <i class="bi bi-envelope-paper"></i> Offer extended — check your email!
+            </div>
+            {% endif %}
+
+            {% if app.stage == 'hired' %}
+            <div class="badge-stage hired" style="font-size: 0.82rem; padding: 0.5rem 1rem;">
+              <i class="bi bi-trophy"></i> Congratulations! Welcome aboard!
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+      {% else %}
+      <div class="empty-state">
+        <i class="bi bi-inbox"></i>
+        <h3>No Applications Yet</h3>
+        <p>Start by browsing our open positions and applying!</p>
+        <a href="{{ url_for('index') }}#openings" class="btn-primary-custom mt-3">
+          <i class="bi bi-search"></i> Browse Openings
+        </a>
+      </div>
+      {% endif %}
+
+      <!-- AI Job Suggestions Section -->
+      <div class="suggestions-section" id="suggestionsSection">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h2 style="font-size: 1.4rem; margin: 0;">
+            <i class="bi bi-stars" style="color: var(--accent);"></i>
+            AI-Recommended Jobs
+          </h2>
+          <button class="btn-primary-custom btn-sm" onclick="loadJobSuggestions()" id="loadSuggestionsBtn">
+            <i class="bi bi-magic"></i> Analyze My Resume
+          </button>
+        </div>
+        <p style="color: var(--text-muted); font-size: 0.88rem; margin-bottom: 1rem;">
+          Our AI analyzes your resume to find the best matching positions for your skills and experience.
+        </p>
+
+        <div class="insights-panel" id="resumeInsights" style="display: none;">
+          <h4 style="font-size: 1rem; margin-bottom: 0.6rem;">
+            <i class="bi bi-lightbulb" style="color: var(--accent);"></i> Resume Insights
+          </h4>
+          <div id="insightsContent"></div>
+        </div>
+
+        <div id="suggestionsContainer">
+          <div style="text-align: center; padding: 1.5rem; color: var(--text-muted); font-size: 0.9rem;">
+            <i class="bi bi-robot" style="font-size: 2rem; display: block; margin-bottom: 0.5rem; opacity: 0.3;"></i>
+            Click "Analyze My Resume" to get personalized job recommendations
+          </div>
+        </div>
+      </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  async function loadJobSuggestions() {
+    const btn = document.getElementById('loadSuggestionsBtn');
+    const container = document.getElementById('suggestionsContainer');
+
+    btn.disabled = true;
+    btn.innerHTML = '<span style="display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.6s linear infinite;"></span> Analyzing...';
+
+    container.innerHTML = `
+            <div class="loading-suggestions">
+                <div class="spinner"></div>
+                <p style="margin-top: 0.8rem;">AI is analyzing your resume and matching with open positions...</p>
+            </div>`;
+
+    try {
+      const response = await fetch('/api/candidate-job-suggestions');
+      const data = await response.json();
+
+      if (data.success && data.suggestions && data.suggestions.length > 0) {
+        if (data.parsed) {
+          const insightsPanel = document.getElementById('resumeInsights');
+          const insightsContent = document.getElementById('insightsContent');
+          let html = '';
+          if (data.parsed.skills && data.parsed.skills.length > 0) {
+            html += '<div style="margin-bottom: 0.5rem;"><strong style="font-size: 0.82rem;">Detected Skills:</strong></div>';
+            html += '<div>' + data.parsed.skills.map(s => `<span class="resume-insight">${s}</span>`).join(' ') + '</div>';
+          }
+          if (data.parsed.domain_expertise && data.parsed.domain_expertise.length > 0) {
+            html += '<div style="margin-top: 0.5rem; margin-bottom: 0.3rem;"><strong style="font-size: 0.82rem;">Domain Expertise:</strong></div>';
+            html += '<div>' + data.parsed.domain_expertise.map(d => `<span class="resume-insight">${d}</span>`).join(' ') + '</div>';
+          }
+          if (data.parsed.experience_years) {
+            html += `<div style="margin-top: 0.5rem; font-size: 0.82rem;"><strong>Experience:</strong> ${data.parsed.experience_years} year(s)</div>`;
+          }
+          insightsContent.innerHTML = html;
+          insightsPanel.style.display = 'block';
+        }
+
+        let suggestionsHtml = '';
+        data.suggestions.forEach(s => {
+          const scoreClass = s.match_score >= 70 ? 'high' : (s.match_score >= 50 ? 'medium' : 'low');
+          let gapsHtml = '';
+          if (s.skill_gaps && s.skill_gaps.length > 0) {
+            gapsHtml = `<div style="margin-top: 0.5rem;">
+                            <span style="font-size: 0.72rem; color: var(--text-muted);">Skill gaps:</span>
+                            ${s.skill_gaps.map(g => `<span class="skill-gap">${g}</span>`).join(' ')}
+                        </div>`;
+          }
+          suggestionsHtml += `
+                    <div class="suggestion-card">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div style="flex: 1;">
+                                <h4 style="font-size: 1rem; margin-bottom: 0.3rem;">${s.job_title}</h4>
+                                <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.3rem;">${s.match_reason}</p>
+                                ${gapsHtml}
+                            </div>
+                            <div>
+                                <span class="match-score ${scoreClass}">
+                                    <i class="bi bi-bullseye"></i> ${s.match_score}%
+                                </span>
+                            </div>
+                        </div>
+                    </div>`;
+        });
+        container.innerHTML = suggestionsHtml;
+      } else {
+        container.innerHTML = `
+                    <div style="text-align: center; padding: 1.5rem; color: var(--text-muted);">
+                        <i class="bi bi-emoji-neutral" style="font-size: 1.5rem;"></i>
+                        <p style="margin-top: 0.5rem;">${data.message || 'No matching jobs found at this time.'}</p>
+                    </div>`;
+      }
+    } catch (err) {
+      container.innerHTML = `
+                <div style="text-align: center; padding: 1.5rem; color: var(--text-muted);">
+                    <i class="bi bi-exclamation-circle" style="font-size: 1.5rem; color: #f44336;"></i>
+                    <p style="margin-top: 0.5rem;">Failed to load suggestions. Please try again later.</p>
+                </div>`;
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-magic"></i> Refresh Suggestions';
+    }
+  }
+</script>
+{% endblock %}

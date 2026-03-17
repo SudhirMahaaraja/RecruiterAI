@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+{% block title %}Candidate History — {{ candidate_email }} | RecruiterAI{% endblock %}
+
+{% block content %}
+<style>
+    .history-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 1.3rem 1.5rem;
+        margin-bottom: 0.9rem;
+        transition: box-shadow 0.18s ease;
+        position: relative;
+    }
+    .history-card:hover {
+        box-shadow: 0 4px 18px rgba(0,0,0,0.08);
+    }
+    .history-card.is-recent {
+        border-left: 3px solid var(--primary);
+    }
+    .history-card.same-role-warn {
+        border-left: 3px solid #ff9800;
+        background: rgba(255,152,0,0.03);
+    }
+    .warn-banner {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.6rem;
+        background: rgba(255,152,0,0.09);
+        border: 1px solid rgba(255,152,0,0.22);
+        border-radius: 10px;
+        padding: 0.75rem 1rem;
+        margin-bottom: 1rem;
+        font-size: 0.84rem;
+        color: #b36b00;
+    }
+    .warn-banner i { font-size: 1rem; margin-top: 1px; flex-shrink: 0; }
+    .info-banner {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.6rem;
+        background: rgba(33,150,243,0.07);
+        border: 1px solid rgba(33,150,243,0.18);
+        border-radius: 10px;
+        padding: 0.75rem 1rem;
+        margin-bottom: 1.5rem;
+        font-size: 0.84rem;
+        color: #0d6eab;
+    }
+    .info-banner i { flex-shrink: 0; margin-top: 1px; }
+    .meta-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.8rem;
+        margin-top: 0.5rem;
+        font-size: 0.82rem;
+        color: var(--text-muted);
+    }
+    .meta-item { display: flex; align-items: center; gap: 0.3rem; }
+    .score-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.18rem 0.55rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 700;
+    }
+    .score-chip.good { background: rgba(76,175,80,0.1); color: #388e3c; }
+    .score-chip.mid { background: rgba(255,152,0,0.1); color: #c47a00; }
+    .score-chip.bad { background: rgba(244,67,54,0.1); color: #c62828; }
+    .reapply-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.2rem 0.55rem;
+        border-radius: 10px;
+        font-size: 0.73rem;
+        font-weight: 600;
+        background: rgba(255,152,0,0.12);
+        color: #c47a00;
+    }
+    .recent-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.2rem 0.55rem;
+        border-radius: 10px;
+        font-size: 0.73rem;
+        font-weight: 600;
+        background: rgba(85,107,47,0.1);
+        color: var(--primary);
+    }
+</style>
+
+<div class="hr-layout">
+    <nav class="hr-sidebar">
+        <div style="padding: 0 1.5rem 1.5rem; border-bottom: 1px solid var(--border); margin-bottom: 1rem;">
+            <div style="font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.5rem;">Logged in as</div>
+            <div style="font-weight: 600; color: var(--text-primary);">{{ session.hr_user.name }}</div>
+        </div>
+        <a href="{{ url_for('hr_dashboard') }}" class="sidebar-link">
+            <i class="bi bi-grid-1x2"></i> Dashboard
+        </a>
+        <a href="{{ url_for('hr_applications') }}" class="sidebar-link active">
+            <i class="bi bi-people"></i> Applications
+        </a>
+        <a href="{{ url_for('hr_jobs') }}" class="sidebar-link">
+            <i class="bi bi-briefcase"></i> Job Listings
+        </a>
+        <a href="{{ url_for('hr_new_job') }}" class="sidebar-link">
+            <i class="bi bi-plus-circle"></i> Post New Job
+        </a>
+        <a href="{{ url_for('hr_rejected_data') }}" class="sidebar-link">
+            <i class="bi bi-trash3"></i> Data Management
+        </a>
+        <div style="margin-top: auto; padding-top: 2rem;">
+            <a href="{{ url_for('hr_logout') }}" class="sidebar-link" style="color: var(--primary-dark);">
+                <i class="bi bi-box-arrow-left"></i> Logout
+            </a>
+        </div>
+    </nav>
+
+    <div class="hr-content">
+
+        <!-- Back -->
+        <a href="{{ url_for('hr_applications') }}" class="btn-secondary-custom btn-sm mb-4">
+            <i class="bi bi-arrow-left"></i> Back to Applications
+        </a>
+
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+            <div>
+                <h1 style="font-size: 1.7rem; margin-bottom: 0.2rem;">Candidate History</h1>
+                <div style="font-size: 0.9rem; color: var(--text-muted);">
+                    <i class="bi bi-envelope"></i> {{ candidate_email }}
+                    {% if candidate %}
+                    &nbsp;&bull;&nbsp;
+                    <i class="bi bi-person"></i> {{ candidate.name }}
+                    {% if candidate.phone %}&nbsp;&bull;&nbsp;<i class="bi bi-phone"></i> {{ candidate.phone }}{% endif %}
+                    {% endif %}
+                </div>
+            </div>
+            <div style="font-size: 0.85rem; color: var(--text-muted); text-align: right;">
+                <div style="font-size: 1.4rem; font-weight: 700; color: var(--text-primary); font-family: 'Space Grotesk', sans-serif;">
+                    {{ total_applications }}
+                </div>
+                total application{{ 's' if total_applications != 1 }}
+            </div>
+        </div>
+
+        <!-- Same-role-within-3-months warnings -->
+        {% if same_role_warnings %}
+        {% for role, msg in same_role_warnings.items() %}
+        <div class="warn-banner">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+            <div>
+                <strong>Duplicate application detected:</strong> "{{ role }}" — {{ msg }}.
+                This candidate applied for the same position multiple times within a 3-month period.
+            </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        <!-- Multi-role info -->
+        {% set unique_roles = applications | map(attribute='job_title') | unique | list %}
+        {% if unique_roles | length > 1 %}
+        <div class="info-banner">
+            <i class="bi bi-diagram-3-fill"></i>
+            <span>
+                This candidate has applied to <strong>{{ unique_roles | length }} different roles</strong>:
+                {{ unique_roles | join(', ') }}.
+            </span>
+        </div>
+        {% endif %}
+
+        <!-- Application Cards -->
+        {% if applications %}
+        {% for app in applications %}
+        {% set is_warn = same_role_warnings and app.job_title in same_role_warnings and app.is_recent %}
+        <div class="history-card {% if is_warn %}same-role-warn{% elif app.is_recent %}is-recent{% endif %}">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                <div style="flex: 1;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.35rem;">
+                        <h4 style="font-size: 1rem; margin: 0;">{{ app.job_title }}</h4>
+                        {% if app.is_recent %}
+                        <span class="recent-tag"><i class="bi bi-clock"></i> Within 3 months</span>
+                        {% endif %}
+                        {% if app.is_reapplication %}
+                        <span class="reapply-tag"><i class="bi bi-arrow-repeat"></i> Reapplication</span>
+                        {% endif %}
+                        {% if is_warn %}
+                        <span style="font-size: 0.72rem; color: #c62828; font-weight: 600;">
+                            <i class="bi bi-exclamation-circle"></i> Duplicate within 3 months
+                        </span>
+                        {% endif %}
+                    </div>
+
+                    <span class="badge-stage {{ app.stage }}">{{ app.stage_label }}</span>
+
+                    <div class="meta-row">
+                        <span class="meta-item">
+                            <i class="bi bi-calendar3"></i>
+                            {{ app.created_at.strftime('%d %b %Y') if app.created_at else 'Unknown date' }}
+                        </span>
+                        <span class="meta-item">
+                            <i class="bi bi-clock-history"></i>
+                            {{ app.days_ago }} day{{ 's' if app.days_ago != 1 }} ago
+                        </span>
+
+                        {% if app.screening_score is not none %}
+                        {% set scr = app.screening_score %}
+                        <span class="score-chip {{ 'good' if scr >= 70 else 'mid' if scr >= 50 else 'bad' }}">
+                            <i class="bi bi-robot"></i> AI {{ scr }}%
+                        </span>
+                        {% endif %}
+
+                        {% if app.assessment_score is not none %}
+                        {% set asc = app.assessment_score %}
+                        <span class="score-chip {{ 'good' if asc >= 60 else 'bad' }}">
+                            <i class="bi bi-clipboard-check"></i> Assess {{ asc }}%
+                        </span>
+                        {% endif %}
+
+                        {% if app.integrity_score is not none %}
+                        {% set isc = app.integrity_score %}
+                        <span class="score-chip {{ 'good' if isc >= 70 else 'mid' if isc >= 50 else 'bad' }}">
+                            <i class="bi bi-shield-check"></i> Integrity {{ isc }}%
+                        </span>
+                        {% endif %}
+
+                        {% if app.proctor_flags and app.proctor_flags | length > 0 %}
+                        <span class="meta-item" style="color: var(--warning);">
+                            <i class="bi bi-flag-fill"></i> {{ app.proctor_flags | length }} proctor flag{{ 's' if app.proctor_flags | length != 1 }}
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <a href="{{ url_for('hr_application_detail', application_id=app._id) }}"
+                   class="btn-secondary-custom btn-sm" style="padding: 0.35rem 0.9rem; white-space: nowrap;">
+                    <i class="bi bi-eye"></i> View
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="empty-state" style="padding: 3rem;">
+            <i class="bi bi-inbox"></i>
+            <h3>No Applications Found</h3>
+            <p>No application history for this candidate.</p>
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+{% endblock %}
+
+{% block footer %}{% endblock %}
