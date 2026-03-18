@@ -1,0 +1,398 @@
+{% extends "base.html" %}
+{% block title %}Data Management — Rejected Candidates | RecruiterAI{% endblock %}
+
+{% block content %}
+<style>
+    .data-mgmt-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .purge-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .retention-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.3rem 0.7rem;
+        border-radius: 20px;
+        font-size: 0.72rem;
+        font-weight: 700;
+    }
+
+    .retention-badge.stale {
+        background: rgba(244, 67, 54, 0.1);
+        color: #f44336;
+    }
+
+    .retention-badge.safe {
+        background: rgba(76, 175, 80, 0.1);
+        color: #4caf50;
+    }
+
+    .retention-badge.warning {
+        background: rgba(255, 152, 0, 0.1);
+        color: #ff9800;
+    }
+
+    .rejected-row {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem 1.2rem;
+        border-bottom: 1px solid var(--border);
+        transition: background 0.15s ease;
+    }
+
+    .rejected-row:hover {
+        background: rgba(85, 107, 47, 0.03);
+    }
+
+    .rejected-row:last-child {
+        border-bottom: none;
+    }
+
+    .bulk-actions {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .btn-danger-custom {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        background: rgba(244, 67, 54, 0.08);
+        color: #f44336;
+        border: 1px solid rgba(244, 67, 54, 0.2);
+    }
+
+    .btn-danger-custom:hover {
+        background: rgba(244, 67, 54, 0.15);
+        border-color: #f44336;
+        transform: translateY(-1px);
+    }
+
+    .btn-warning-custom {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        background: rgba(255, 152, 0, 0.08);
+        color: #ff9800;
+        border: 1px solid rgba(255, 152, 0, 0.2);
+    }
+
+    .btn-warning-custom:hover {
+        background: rgba(255, 152, 0, 0.15);
+        border-color: #ff9800;
+        transform: translateY(-1px);
+    }
+
+    .policy-info {
+        display: flex;
+        gap: 1.5rem;
+        flex-wrap: wrap;
+        margin-top: 1rem;
+    }
+
+    .policy-item {
+        flex: 1;
+        min-width: 200px;
+        padding: 1rem;
+        background: rgba(85, 107, 47, 0.04);
+        border-radius: 10px;
+        text-align: center;
+    }
+
+    .policy-item .policy-icon {
+        font-size: 1.5rem;
+        margin-bottom: 0.3rem;
+    }
+
+    .policy-item .policy-label {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .policy-item .policy-value {
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+
+    .confirm-modal-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        background: rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(4px);
+        display: none;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .confirm-modal-overlay.show {
+        display: flex;
+    }
+
+    .confirm-modal {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        padding: 2rem;
+        max-width: 430px;
+        width: 90%;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+        text-align: center;
+    }
+</style>
+
+<div class="hr-layout">
+    <!-- Sidebar -->
+    <nav class="hr-sidebar">
+        <div style="padding: 0 1.5rem 1.5rem; border-bottom: 1px solid var(--border); margin-bottom: 1rem;">
+            <div
+                style="font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.5rem;">
+                Logged in as</div>
+            <div style="font-weight: 600; color: var(--text-primary);">{{ session.hr_user.name }}</div>
+        </div>
+        <a href="{{ url_for('hr_dashboard') }}" class="sidebar-link">
+            <i class="bi bi-grid-1x2"></i> Dashboard
+        </a>
+        <a href="{{ url_for('hr_applications') }}" class="sidebar-link">
+            <i class="bi bi-people"></i> Applications
+        </a>
+        <a href="{{ url_for('hr_jobs') }}" class="sidebar-link">
+            <i class="bi bi-briefcase"></i> Job Listings
+        </a>
+        <a href="{{ url_for('hr_new_job') }}" class="sidebar-link">
+            <i class="bi bi-plus-circle"></i> Post New Job
+        </a>
+        <a href="{{ url_for('hr_rejected_data') }}" class="sidebar-link active">
+            <i class="bi bi-trash3"></i> Data Management
+        </a>
+        <div style="margin-top: auto; padding-top: 2rem;">
+            <a href="{{ url_for('hr_logout') }}" class="sidebar-link" style="color: var(--primary-dark);">
+                <i class="bi bi-box-arrow-left"></i> Logout
+            </a>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="hr-content">
+        <div class="data-mgmt-header">
+            <div>
+                <h1 style="font-size: 1.8rem;"><i class="bi bi-trash3" style="color: var(--primary);"></i> Data
+                    Management</h1>
+                <p style="color: var(--text-muted);">Manage rejected candidate data & retention policy</p>
+            </div>
+        </div>
+
+        <!-- Retention Policy Card -->
+        <div class="purge-card">
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.8rem;">
+                <i class="bi bi-shield-check" style="font-size: 1.2rem; color: var(--primary);"></i>
+                <h3 style="font-size: 1.1rem; margin: 0;">Data Retention Policy</h3>
+            </div>
+            <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+                Rejected candidate data is automatically purged <strong>5 months</strong> after rejection. This complies
+                with data minimization principles. You can also manually delete records at any time.
+            </p>
+
+            {% set total_rejected = rejected_apps | length %}
+            {% set stale_count = rejected_apps | selectattr('is_stale') | list | length %}
+            {% set active_count = total_rejected - stale_count %}
+
+            <div class="policy-info">
+                <div class="policy-item">
+                    <div class="policy-icon"><i class="bi bi-database" style="color: var(--primary);"></i></div>
+                    <div class="policy-value">{{ total_rejected }}</div>
+                    <div class="policy-label">Total Rejected</div>
+                </div>
+                <div class="policy-item">
+                    <div class="policy-icon"><i class="bi bi-clock-history" style="color: #ff9800;"></i></div>
+                    <div class="policy-value">{{ stale_count }}</div>
+                    <div class="policy-label">Older than 5 months</div>
+                </div>
+                <div class="policy-item">
+                    <div class="policy-icon"><i class="bi bi-shield-lock" style="color: #4caf50;"></i></div>
+                    <div class="policy-value">{{ active_count }}</div>
+                    <div class="policy-label">Within Retention</div>
+                </div>
+                <div class="policy-item">
+                    <div class="policy-icon"><i class="bi bi-calendar-event" style="color: var(--primary);"></i></div>
+                    <div class="policy-value">2:00 AM</div>
+                    <div class="policy-label">Auto-Purge Schedule</div>
+                </div>
+            </div>
+
+            {% if total_rejected > 0 %}
+            <div style="margin-top: 1.2rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                {% if stale_count > 0 %}
+                <button class="btn-warning-custom" data-type="stale" data-count="{{ stale_count }}" onclick="showConfirmModal(this.dataset.type, Number(this.dataset.count))">
+                    <i class="bi bi-clock-history"></i> Purge {{ stale_count }} Stale Record(s)
+                </button>
+                {% endif %}
+                <button class="btn-danger-custom" data-type="all" data-count="{{ total_rejected }}" onclick="showConfirmModal(this.dataset.type, Number(this.dataset.count))">
+                    <i class="bi bi-trash3-fill"></i> Delete All {{ total_rejected }} Rejected Record(s)
+                </button>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Rejected Applications List -->
+        <div class="card-glass" style="padding: 0; overflow: hidden;">
+            <div style="padding: 1rem 1.5rem; border-bottom: 1px solid var(--border);">
+                <h3 style="font-size: 1.05rem; margin: 0;">
+                    <i class="bi bi-people"></i> Rejected Applications ({{ rejected_apps | length }})
+                </h3>
+            </div>
+
+            {% if rejected_apps %}
+            {% for app in rejected_apps %}
+            <div class="rejected-row" id="row-{{ app._id }}">
+                <div style="flex: 1;">
+                    <div style="font-weight: 600; font-size: 0.95rem;">{{ app.name }}</div>
+                    <div style="font-size: 0.78rem; color: var(--text-muted);">{{ app.email }} &middot; {{ app.job_title
+                        }}</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 0.75rem; color: var(--text-muted);">Rejected</div>
+                    <div style="font-size: 0.85rem; font-weight: 600;">{{ app.age_months }} months ago</div>
+                </div>
+                <div>
+                    {% if app.is_stale %}
+                    <span class="retention-badge stale">
+                        <i class="bi bi-exclamation-circle-fill"></i> Expired
+                    </span>
+                    {% elif app.age_months >= 4 %}
+                    <span class="retention-badge warning">
+                        <i class="bi bi-clock"></i> Expiring Soon
+                    </span>
+                    {% else %}
+                    <span class="retention-badge safe">
+                        <i class="bi bi-check-circle-fill"></i> Within Policy
+                    </span>
+                    {% endif %}
+                </div>
+                <div>
+                    <button class="btn-danger-custom" style="padding: 0.35rem 0.7rem; font-size: 0.78rem;"
+                        onclick="deleteSingle('{{ app._id }}')">
+                        <i class="bi bi-trash3"></i> Delete
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="empty-state" style="padding: 3rem;">
+                <i class="bi bi-check-circle" style="font-size: 2.5rem; color: #4caf50;"></i>
+                <h3>No Rejected Data</h3>
+                <p>There are no rejected candidate records to manage.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Confirmation Modal -->
+<div class="confirm-modal-overlay" id="confirmModal">
+    <div class="confirm-modal">
+        <div
+            style="width: 60px; height: 60px; border-radius: 50%; background: rgba(244,67,54,0.1); display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem;">
+            <i class="bi bi-exclamation-triangle-fill" style="font-size: 1.5rem; color: #f44336;"></i>
+        </div>
+        <h3 style="font-weight: 800; margin-bottom: 0.5rem;" id="confirmTitle">Confirm Deletion</h3>
+        <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1.5rem;" id="confirmMessage"></p>
+        <form id="deleteForm" method="POST" action="{{ url_for('hr_delete_rejected') }}">
+            <input type="hidden" name="delete_type" id="deleteType" value="stale">
+            <div style="display: flex; gap: 0.5rem; justify-content: center;">
+                <button type="button" class="btn-secondary-custom" onclick="hideConfirmModal()">Cancel</button>
+                <button type="submit" class="btn-danger-custom">
+                    <i class="bi bi-trash3-fill"></i> Delete Permanently
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block footer %}{% endblock %}
+
+{% block scripts %}
+<script>
+    function showConfirmModal(type, count) {
+        const modal = document.getElementById('confirmModal');
+        const title = document.getElementById('confirmTitle');
+        const message = document.getElementById('confirmMessage');
+        const deleteType = document.getElementById('deleteType');
+
+        deleteType.value = type;
+
+        if (type === 'stale') {
+            title.textContent = `Purge ${count} Stale Record(s)?`;
+            message.innerHTML = `This will permanently delete <strong>${count}</strong> rejected application(s) that are older than 5 months, including resumes, assessment results, and proctoring logs. <br><br><strong>This action cannot be undone.</strong>`;
+        } else {
+            title.textContent = `Delete All ${count} Rejected Record(s)?`;
+            message.innerHTML = `This will permanently delete <strong>ALL ${count}</strong> rejected application(s), regardless of age, including resumes, assessment results, and proctoring logs. <br><br><strong>This action cannot be undone.</strong>`;
+        }
+
+        modal.classList.add('show');
+    }
+
+    function hideConfirmModal() {
+        document.getElementById('confirmModal').classList.remove('show');
+    }
+
+    async function deleteSingle(applicationId) {
+        if (!confirm('Delete this rejected application and all associated data? This cannot be undone.')) return;
+
+        const row = document.getElementById(`row-${applicationId}`);
+        try {
+            const response = await fetch(`/api/delete-rejected-application/${applicationId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const result = await response.json();
+            if (result.success) {
+                row.style.transition = 'opacity 0.3s, transform 0.3s';
+                row.style.opacity = '0';
+                row.style.transform = 'translateX(20px)';
+                setTimeout(() => row.remove(), 300);
+            } else {
+                alert('Error: ' + (result.error || 'Failed to delete'));
+            }
+        } catch (err) {
+            alert('Network error: ' + err.message);
+        }
+    }
+
+    // Close modal on overlay click
+    document.getElementById('confirmModal').addEventListener('click', function (e) {
+        if (e.target === this) hideConfirmModal();
+    });
+</script>
+{% endblock %}
